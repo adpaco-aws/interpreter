@@ -1,12 +1,29 @@
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, bolero_generator::TypeGenerator)]
-#[cfg_attr(kani, derive(kani::Arbitrary))]
-pub enum Var {
-    X,
-    Y,
-    Z,
-}
+extern crate creusot_contracts;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, bolero_generator::TypeGenerator)]
+use creusot_contracts::{ensures, open, ghost, trusted};
+
+// #[derive(Debug, creusot_contracts::std::cmp::PartialEq, Eq, Hash, Clone, Copy)]
+// #[cfg_attr(kani, derive(kani::Arbitrary))]
+// pub enum Var {
+//     X,
+//     Y,
+//     Z,
+// }
+
+// impl DeepModel for Var {
+//     type DeepModelTy = Var;
+//     #[ghost]
+//     #[open]
+//     fn deep_model(self) -> Self::DeepModelTy {
+//         match self {
+//             Var::X => Var::X.deep_model(),
+//             Var::Y => Var::Y.deep_model(),
+//             Var::Z => Var::Z.deep_model(),
+//         }
+//     }
+// }
+
+#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Clone, Copy)]
 #[cfg_attr(kani, derive(kani::Arbitrary))]
 
 pub enum BinaryOp {
@@ -15,12 +32,26 @@ pub enum BinaryOp {
     Add,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, bolero_generator::TypeGenerator)]
+// impl DeepModel for BinaryOp {
+//     type DeepModelTy = BinaryOp;
+//     #[ghost]
+//     #[open]
+//     fn deep_model(self) -> Self::DeepModelTy {
+//         match self {
+//             BinaryOp::Eq => BinaryOp::Eq.deep_model(),
+//             BinaryOp::LessEq => BinaryOp::LessEq.deep_model(),
+//             BinaryOp::Add => BinaryOp::Add.deep_model(),
+//         }
+//     }
+// }
+
+
+#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Clone)]
 // #[cfg_attr(kani, derive(kani::Arbitrary))]
 pub enum Expr {
     Int(i32),
     Bool(bool),
-    Var(Var),
+    // Var(Var),
     If {
         test_expr: Box<Expr>,
         then_expr: Box<Expr>,
@@ -33,48 +64,93 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, bolero_generator::TypeGenerator)]
+// impl DeepModel for Expr {
+//     type DeepModelTy = Expr;
+//     #[ghost]
+//     #[open]
+//     fn deep_model(self) -> Self::DeepModelTy {
+//         pearlite! { absurd }
+//     }
+// }
+
+// #[creusot_contracts::trusted]
+// impl<T: DeepModel> for Expr<T> {
+//     type DeepModelTy = T::DeepModelTy;
+//     #[ghost]
+//     fn deep_model(self) -> Self::DeepModelTy {
+//         match self {
+//             Expr::Int(i) => i.deep_model(),
+//             Expr::Bool(b) => b.deep_model(),
+//             Expr::Var(v) => v.deep_model(),
+//             If {
+//                 test_expr: Box<Expr>,
+//                 then_expr: Box<Expr>,
+//                 else_expr: Box<Expr>,
+//             } => if test_expr.interpret {}
+//         }
+//     }
+// }
+
+#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Copy, Clone)]
 pub enum Value {
     Int(i32),
     Bool(bool),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, bolero_generator::TypeGenerator)]
+#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Copy, Clone)]
 pub enum Type {
     IntType,
     BoolType,
 }
 
 pub struct Typechecker {
-    x: Type,
-    y: Type,
-    z: Type,
+    // x: Type,
+    // y: Type,
+    // z: Type,
 }
 
 impl Typechecker {
-    pub fn new(x: Type, y: Type, z: Type) -> Self {
-        Self { x: x, y: y, z: z }
+    // pub fn new(_x: Type, _y: Type, _z: Type) -> Self {
+    pub fn new() -> Self {    
+        // Self { x: x, y: y, z: z }
+        Self { }
+    }
+
+    // #[predicate]
+    // typechecks(expr: &Expr) -> bool {
+    //     e.typecheck().is_ok()
+    // }
+
+    // #[variant(e)]
+    #[creusot_contracts::predicate]
+    fn typechecks(e: &Expr) -> bool {
+        match e {
+            Expr::Int(_) => true,
+            Expr::Bool(_) => true,
+            _ => false,
+        }
     }
 
     // Type signature has changed: We pass `e` by reference (`&Expr`).
     // That way, we avoid cloning the expression in the Kani harnesses.
-    pub fn typecheck(&self, e: &Expr) -> Result<Type, ()> {
+    // pub fn typecheck(&self, e: &Expr) -> Result<Type, ()> {
+    pub fn typecheck(e: &Expr) -> Result<Type, ()> {
         match e {
             Expr::Int(_) => Ok(Type::IntType),
             Expr::Bool(_) => Ok(Type::BoolType),
-            Expr::Var(Var::X) => Ok(self.x),
-            Expr::Var(Var::Y) => Ok(self.y),
-            Expr::Var(Var::Z) => Ok(self.z),
+            // Expr::Var(Var::X) => Ok(self.x),
+            // Expr::Var(Var::Y) => Ok(self.y),
+            // Expr::Var(Var::Z) => Ok(self.z),
             Expr::If {
                 test_expr,
                 then_expr,
                 else_expr,
-            } => match self.typecheck(test_expr) {
+            } => match Typechecker::typecheck(test_expr) {
                 Ok(t) => match t {
                     Type::IntType => Err(()),
                     Type::BoolType => {
-                        let tt = self.typecheck(then_expr);
-                        let te = self.typecheck(else_expr);
+                        let tt = Typechecker::typecheck(then_expr);
+                        let te = Typechecker::typecheck(else_expr);
                         if tt.is_err() || te.is_err() || tt != te {
                             Err(())
                         } else {
@@ -85,8 +161,8 @@ impl Typechecker {
                 Err(e) => Err(e),
             },
             Expr::BinaryApp { op, arg1, arg2 } => {
-                let t1 = self.typecheck(arg1);
-                let t2 = self.typecheck(arg2);
+                let t1 = Typechecker::typecheck(arg1);
+                let t2 = Typechecker::typecheck(arg2);
                 if let (Ok(t1), Ok(t2)) = (t1, t2) {
                     match op {
                         BinaryOp::Eq => Ok(Type::BoolType),
@@ -107,43 +183,45 @@ impl Typechecker {
     }
 }
 pub struct Evaluator {
-    x: Option<Value>,
-    y: Option<Value>,
-    z: Option<Value>,
+    // x: Option<Value>,
+    // y: Option<Value>,
+    // z: Option<Value>,
 }
 
 impl Evaluator {
-    pub fn new(x: Option<Value>, y: Option<Value>, z: Option<Value>) -> Self {
-        Self { x: x, y: y, z: z }
+    // pub fn new(x: Option<Value>, y: Option<Value>, z: Option<Value>) -> Self {
+    pub fn new() -> Self {    
+        Self { }
     }
 
-    pub fn interpret(&self, e: Expr) -> Result<Value, ()> {
+    // #[ensures(Typechecker::typecheck(&e).is_ok() ==> Evaluator::interpret(e).is_ok())]
+    pub fn interpret(e: Expr) -> Result<Value, ()> {
         match e {
             Expr::Int(i) => Ok(Value::Int(i)),
             Expr::Bool(b) => Ok(Value::Bool(b)),
-            Expr::Var(Var::X) => self.x.ok_or(()),
-            Expr::Var(Var::Y) => self.y.ok_or(()),
-            Expr::Var(Var::Z) => self.z.ok_or(()),
+            // Expr::Var(Var::X) => self.x.ok_or(()),
+            // Expr::Var(Var::Y) => self.y.ok_or(()),
+            // Expr::Var(Var::Z) => self.z.ok_or(()),
             Expr::If {
                 test_expr,
                 then_expr,
                 else_expr,
-            } => match self.interpret(*test_expr) {
+            } => match Evaluator::interpret(*test_expr) {
                 Ok(v) => match v {
                     Value::Int(_) => Err(()),
                     Value::Bool(b) => {
                         if b {
-                            self.interpret(*then_expr)
+                            Evaluator::interpret(*then_expr)
                         } else {
-                            self.interpret(*else_expr)
+                            Evaluator::interpret(*else_expr)
                         }
                     }
                 },
                 Err(e) => Err(e),
             },
             Expr::BinaryApp { op, arg1, arg2 } => {
-                let v1 = self.interpret(*arg1);
-                let v2 = self.interpret(*arg2);
+                let v1 = Evaluator::interpret(*arg1);
+                let v2 = Evaluator::interpret(*arg2);
                 if let (Ok(v1), Ok(v2)) = (v1, v2) {
                     match op {
                         BinaryOp::Eq => Ok(Value::Bool(v1 == v2)),
@@ -166,9 +244,10 @@ impl Evaluator {
 
 #[test]
 pub fn test_eval() {
-    let eval = Evaluator::new(Some(Value::Int(1)), None, None);
+    // let eval = Evaluator::new(Some(Value::Int(1)), None, None);
+    let eval = Evaluator::new();
     assert_eq!(
-        eval.interpret(Expr::BinaryApp {
+        Evaluator::interpret(Expr::BinaryApp {
             op: BinaryOp::Add,
             arg1: Box::new(Expr::Int(3)),
             arg2: Box::new(Expr::Int(4))
@@ -193,12 +272,8 @@ pub fn test_eval() {
 #[cfg_attr(kani, kani::proof)]
 #[cfg_attr(kani, kani::unwind(5))]
 pub fn check_expr() {
-    let eval = Evaluator::new(
-        Some(Value::Int(1)),
-        Some(Value::Int(1)),
-        Some(Value::Int(1)),
-    );
-    let tc = Typechecker::new(Type::IntType, Type::IntType, Type::IntType);
+    let eval = Evaluator::new();
+    let tc = Typechecker::new();
     bolero::check!()
         .with_type::<Expr>()
         .cloned()

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 bolero = "0.9"
 bolero-generator = "0.9"
+creusot-contracts = { path = "/Users/accorell/creusot-experiments/creusot/creusot-contracts" }

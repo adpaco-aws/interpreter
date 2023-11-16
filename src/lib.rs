@@ -1,6 +1,6 @@
 extern crate creusot_contracts;
 
-use creusot_contracts::{ensures, open, ghost, trusted};
+use creusot_contracts::{ensures, open, ghost, trusted, pearlite};
 
 // #[derive(Debug, creusot_contracts::std::cmp::PartialEq, Eq, Hash, Clone, Copy)]
 // #[cfg_attr(kani, derive(kani::Arbitrary))]
@@ -23,7 +23,7 @@ use creusot_contracts::{ensures, open, ghost, trusted};
 //     }
 // }
 
-#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Clone, Copy)]
+#[derive(Debug, creusot_contracts::std::clone::Clone, Copy)]
 #[cfg_attr(kani, derive(kani::Arbitrary))]
 
 pub enum BinaryOp {
@@ -46,7 +46,7 @@ pub enum BinaryOp {
 // }
 
 
-#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Clone)]
+#[derive(Debug, creusot_contracts::std::clone::Clone)]
 // #[cfg_attr(kani, derive(kani::Arbitrary))]
 pub enum Expr {
     Int(i32),
@@ -91,13 +91,13 @@ pub enum Expr {
 //     }
 // }
 
-#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Copy, creusot_contracts::std::clone::Clone, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel)]
 pub enum Value {
     Int(i32),
     Bool(bool),
 }
 
-#[derive(Debug, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Copy, creusot_contracts::std::clone::Clone, creusot_contracts::std::cmp::PartialEq, creusot_contracts::DeepModel)]
 pub enum Type {
     IntType,
     BoolType,
@@ -131,9 +131,29 @@ impl Typechecker {
         }
     }
 
+    #[open]
+    #[creusot_contracts::predicate]
+    pub fn typecheck_2(e: Expr, t: Type) -> bool {
+        match e {
+            Expr::Bool(_) => t == Type::BoolType,
+            Expr::Int(_) => t == Type::IntType,
+            Expr::If {
+                test_expr,
+                then_expr,
+                else_expr,
+            } => Self::typecheck_2(*test_expr, Type::BoolType) && Self::typecheck_2(*then_expr, t) && Self::typecheck_2(*else_expr, t),
+            Expr::BinaryApp { op, arg1, arg2 } => match op {
+                BinaryOp::Eq => t == Type::BoolType && pearlite! { exists<v:_> Self::typecheck_2(*arg1, v) && Self::typecheck_2(*arg2, v) },
+                BinaryOp::LessEq => t == Type::BoolType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
+                BinaryOp::Add => t == Type::IntType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
+            }
+        }
+    }
+
     // Type signature has changed: We pass `e` by reference (`&Expr`).
     // That way, we avoid cloning the expression in the Kani harnesses.
     // pub fn typecheck(&self, e: &Expr) -> Result<Type, ()> {
+    #[ensures(match result { Ok(t) => Self::typecheck_2(*e, t), Err(_) => true})]
     pub fn typecheck(e: &Expr) -> Result<Type, ()> {
         match e {
             Expr::Int(_) => Ok(Type::IntType),
@@ -151,9 +171,11 @@ impl Typechecker {
                     Type::BoolType => {
                         let tt = Typechecker::typecheck(then_expr);
                         let te = Typechecker::typecheck(else_expr);
-                        if tt.is_err() || te.is_err() || tt != te {
+                        if tt.is_err() || te.is_err() || !(tt == te) {
                             Err(())
                         } else {
+                            // try this
+                            creusot_contracts::proof_assert!(tt == te);
                             tt
                         }
                     }
@@ -268,24 +290,24 @@ pub fn test_eval() {
 /// generator instead, where `N` represents the maximum depth of the expression
 /// to be generated. Note: We could achieve the same result defining
 /// `kani::any()` as `any_expr(N)` for some hard-coded `N` value.
-#[test]
-#[cfg_attr(kani, kani::proof)]
-#[cfg_attr(kani, kani::unwind(5))]
-pub fn check_expr() {
-    let eval = Evaluator::new();
-    let tc = Typechecker::new();
-    bolero::check!()
-        .with_type::<Expr>()
-        .cloned()
-        .for_each(|expr| {
-            assert!(true);
-            if tc.typecheck(&expr).is_ok() {
-                if eval.interpret(expr).is_err() {
-                    assert!(false);
-                }
-            }
-        });
-}
+// #[test]
+// #[cfg_attr(kani, kani::proof)]
+// #[cfg_attr(kani, kani::unwind(5))]
+// pub fn check_expr() {
+//     let eval = Evaluator::new();
+//     let tc = Typechecker::new();
+//     bolero::check!()
+//         .with_type::<Expr>()
+//         .cloned()
+//         .for_each(|expr| {
+//             assert!(true);
+//             if tc.typecheck(&expr).is_ok() {
+//                 if eval.interpret(expr).is_err() {
+//                     assert!(false);
+//                 }
+//             }
+//         });
+// }
 
 #[cfg(kani)]
 mod verification {

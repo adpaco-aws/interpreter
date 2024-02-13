@@ -56,7 +56,7 @@ impl Typechecker {
         Self { x: x, y: y, z: z }
     }
 
-    pub fn typecheck_2(e: Expr, t: Type) -> bool {
+    pub fn typecheck_2(e: &Expr, t: Type) -> bool {
         match e {
             Expr::Bool(_) => t == Type::BoolType,
             Expr::Int(_) => t == Type::IntType,
@@ -64,19 +64,19 @@ impl Typechecker {
                 test_expr,
                 then_expr,
                 else_expr,
-            } => Self::typecheck_2(*test_expr, Type::BoolType) && Self::typecheck_2(*then_expr, t) && Self::typecheck_2(*else_expr, t),
+            } => Self::typecheck_2(test_expr, Type::BoolType) && Self::typecheck_2(then_expr, t) && Self::typecheck_2(else_expr, t),
             Expr::BinaryApp { op, arg1, arg2 } => match op {
-                BinaryOp::Eq => t == Type::BoolType && //pearlite! { exists<v:_> Self::typecheck_2(*arg1, v) && Self::typecheck_2(*arg2, v) },
+                BinaryOp::Eq => t == Type::BoolType && //pearlite! { exists<v:_> Self::typecheck_2(arg1, v) && Self::typecheck_2(arg2, v) },
                 // Can't use `exists` so we instantiate each type separately as a workaround
-                ((Self::typecheck_2(*arg1.clone(), Type::BoolType) && (Self::typecheck_2(*arg2.clone(), Type::BoolType))) || (Self::typecheck_2(*arg1, Type::IntType) && (Self::typecheck_2(*arg2, Type::IntType)))),
-                BinaryOp::LessEq => t == Type::BoolType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
-                BinaryOp::Add => t == Type::IntType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
+                ((Self::typecheck_2(arg1, Type::BoolType) && (Self::typecheck_2(arg2, Type::BoolType))) || (Self::typecheck_2(arg1, Type::IntType) && (Self::typecheck_2(arg2, Type::IntType)))),
+                BinaryOp::LessEq => t == Type::BoolType && Self::typecheck_2(arg1, Type::IntType) && Self::typecheck_2(arg2, Type::IntType),
+                BinaryOp::Add => t == Type::IntType && Self::typecheck_2(arg1, Type::IntType) && Self::typecheck_2(arg2, Type::IntType),
             }
         }
     }
     // Type signature has changed: We pass `e` by reference (`&Expr`).
     // That way, we avoid cloning the expression in the Kani harnesses.
-    #[kani::ensures(match result { Ok(t) => Self::typecheck_2(*e, t), Err(_) => true})]
+    #[kani::ensures(match result { Ok(t) => Self::typecheck_2(e, t), Err(_) => true})]
     pub fn typecheck(&self, e: &Expr) -> Result<Type, ()> {
         match e {
             Expr::Int(_) => Ok(Type::IntType),

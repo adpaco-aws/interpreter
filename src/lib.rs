@@ -1,10 +1,10 @@
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, bolero_generator::TypeGenerator)]
-#[cfg_attr(kani, derive(kani::Arbitrary))]
-pub enum Var {
-    X,
-    Y,
-    Z,
-}
+// #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, bolero_generator::TypeGenerator)]
+// #[cfg_attr(kani, derive(kani::Arbitrary))]
+// pub enum Var {
+//     X,
+//     Y,
+//     Z,
+// }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, bolero_generator::TypeGenerator)]
 #[cfg_attr(kani, derive(kani::Arbitrary))]
@@ -20,7 +20,7 @@ pub enum BinaryOp {
 pub enum Expr {
     Int(i32),
     Bool(bool),
-    Var(Var),
+    // Var(Var),
     If {
         test_expr: Box<Expr>,
         then_expr: Box<Expr>,
@@ -39,7 +39,7 @@ pub enum Value {
     Bool(bool),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, bolero_generator::TypeGenerator)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, bolero_generator::TypeGenerator, kani::Arbitrary)]
 pub enum Type {
     IntType,
     BoolType,
@@ -56,15 +56,34 @@ impl Typechecker {
         Self { x: x, y: y, z: z }
     }
 
+    pub fn typecheck_2(e: Expr, t: Type) -> bool {
+        match e {
+            Expr::Bool(_) => t == Type::BoolType,
+            Expr::Int(_) => t == Type::IntType,
+            Expr::If {
+                test_expr,
+                then_expr,
+                else_expr,
+            } => Self::typecheck_2(*test_expr, Type::BoolType) && Self::typecheck_2(*then_expr, t) && Self::typecheck_2(*else_expr, t),
+            Expr::BinaryApp { op, arg1, arg2 } => match op {
+                BinaryOp::Eq => t == Type::BoolType && //pearlite! { exists<v:_> Self::typecheck_2(*arg1, v) && Self::typecheck_2(*arg2, v) },
+                // Can't use `exists` so we instantiate each type separately as a workaround
+                ((Self::typecheck_2(*arg1.clone(), Type::BoolType) && (Self::typecheck_2(*arg2.clone(), Type::BoolType))) || (Self::typecheck_2(*arg1, Type::IntType) && (Self::typecheck_2(*arg2, Type::IntType)))),
+                BinaryOp::LessEq => t == Type::BoolType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
+                BinaryOp::Add => t == Type::IntType && Self::typecheck_2(*arg1, Type::IntType) && Self::typecheck_2(*arg2, Type::IntType),
+            }
+        }
+    }
     // Type signature has changed: We pass `e` by reference (`&Expr`).
     // That way, we avoid cloning the expression in the Kani harnesses.
+    #[kani::ensures(match result { Ok(t) => Self::typecheck_2(*e, t), Err(_) => true})]
     pub fn typecheck(&self, e: &Expr) -> Result<Type, ()> {
         match e {
             Expr::Int(_) => Ok(Type::IntType),
             Expr::Bool(_) => Ok(Type::BoolType),
-            Expr::Var(Var::X) => Ok(self.x),
-            Expr::Var(Var::Y) => Ok(self.y),
-            Expr::Var(Var::Z) => Ok(self.z),
+            // Expr::Var(Var::X) => Ok(self.x),
+            // Expr::Var(Var::Y) => Ok(self.y),
+            // Expr::Var(Var::Z) => Ok(self.z),
             Expr::If {
                 test_expr,
                 then_expr,
@@ -121,9 +140,9 @@ impl Evaluator {
         match e {
             Expr::Int(i) => Ok(Value::Int(i)),
             Expr::Bool(b) => Ok(Value::Bool(b)),
-            Expr::Var(Var::X) => self.x.ok_or(()),
-            Expr::Var(Var::Y) => self.y.ok_or(()),
-            Expr::Var(Var::Z) => self.z.ok_or(()),
+            // Expr::Var(Var::X) => self.x.ok_or(()),
+            // Expr::Var(Var::Y) => self.y.ok_or(()),
+            // Expr::Var(Var::Z) => self.z.ok_or(()),
             Expr::If {
                 test_expr,
                 then_expr,
@@ -223,14 +242,14 @@ mod verification {
         if depth == 0 {
             match kani::any() {
                 0 => Expr::Int(kani::any()),
-                1 => Expr::Bool(kani::any()),
-                _ => Expr::Var(kani::any()),
+                _ => Expr::Bool(kani::any()),
+                // _ => Expr::Var(kani::any()),
             }
         } else {
             match kani::any() {
                 0 => Expr::Int(kani::any()),
                 1 => Expr::Bool(kani::any()),
-                2 => Expr::Var(kani::any()),
+                // 2 => Expr::Var(kani::any()),
                 3 => Expr::If {
                     test_expr: Box::new(any_expr(depth - 1)),
                     then_expr: Box::new(any_expr(depth - 1)),
